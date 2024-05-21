@@ -16077,31 +16077,30 @@ def chequeEmail(request):
             return redirect(cheque_statement)
 #End
 # Amrutha Biju
+
 def sales_summary(request):
   id=request.session.get('staff_id')
   staff=staff_details.objects.get(id=id)
-  purchase_data=PurchaseBill.objects.filter(company=staff.company)
-  debit_note=purchasedebit.objects.filter(company=staff.company)
-  sales_invoices=SalesInvoice.objects.all()
-  sales_invoice_items=SalesInvoiceItem.objects.all()
-  combined_data = zip(sales_invoices, sales_invoice_items)
+  # purchase_data=PurchaseBill.objects.filter(company=staff.company)
+  # debit_note=purchasedebit.objects.filter(company=staff.company)
+  sales_invoices=SalesInvoice.objects.filter(company=staff.company)
+  sales_invoice_items=SalesInvoiceItem.objects.filter(company=staff.company)
   paid = unpaid = total=0
-  for i in purchase_data:
-    paid +=float(i.advance)
-    unpaid +=float(i.balance)
+ 
+  for i in sales_invoices:
+    
     total +=float(i.grandtotal)
 
   
   content={
     
-    'com': combined_data,
-    'bill':purchase_data,
-    'debit':debit_note,
+    'bill':sales_invoices,
+    'debit':sales_invoice_items,
     'staff':staff,
     'paid':paid,
     'unpaid':unpaid,
     'total':total
   }
-  return render(request,'company/sales_summaryhsn.html',content)
+  return render(request,'company/summaryhsn.html',content)
 
-  #------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------
