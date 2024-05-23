@@ -544,7 +544,7 @@ urlpatterns = [
 
     #Amrutha Biju
     path('sales_summary/',views.sales_summary,name='sales_summary'),
-    #path('send_hsn_report_via_mail/',views.send_hsn_report_via_mail,name='send_hsn_report_via_mail'),
+    path('send_hsn_report_via_mail/',views.send_hsn_report_via_mail,name='send_hsn_report_via_mail'),
 
     #End
     
