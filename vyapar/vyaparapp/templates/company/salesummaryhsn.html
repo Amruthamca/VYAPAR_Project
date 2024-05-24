@@ -96,7 +96,7 @@
 
 .totals-container {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
 }
 
@@ -115,9 +115,7 @@
     margin: 0;
     text-align: left; /* Ensure values are aligned to the left */
 }
-.total-value {
-    display: none;
-}
+
 .total-count{
     text-align: right;
 }
@@ -184,21 +182,21 @@
                         <div class="d-flex">
                             <div class="  p-3 m-3  mr-3 ml-3 fs-3" style="border-radius: 10px;background-color: lightgrey;width: 150px;">
                                 <p style="margin-bottom: 5px;"> Paid</p>
-                                <p style="font-size:large;"> <span id="paidval"></span></p>
+                                <p style="font-size:large;"> <span id="paidval">{{paid}}</span></p>
                             </div>
                             <div class="text-dark pt-5" >
                                 <i class="fa fa-plus border-dark " aria-hidden="true" style="color: black;"></i>
                             </div>
                             <div class="  p-3 m-3  mr-3 ml-3  fs-3" style="border-radius:10px;background-color: lightsteelblue;width: 150px;">
                                 <p style="margin-bottom: 5px;"> Unpaid</p>
-                                <p style="font-size:large;"><span id="unpaidval"></span></p>
+                                <p style="font-size:large;"><span id="unpaidval">{{unpaid}}</span></p>
                             </div>
                             <div class="text-dark pt-5">
                                 <i class="fa-solid fa fa-equals" style="color: black;"></i>
                             </div>
                             <div class=" p-3 m-3 mr-3 ml-3  fs-3" style="border-radius:10px;background-color: lightgreen;width: 150px;">
                                 <p style="margin-bottom: 5px;"> Total</p>
-                                <p style="font-size:large;">  <span id="totalval"></span></p>
+                                <p style="font-size:large;">  <span id="totalval">{{total}}</span></p>
                             </div>
                         </div>
                     </div>
@@ -529,21 +527,21 @@
                         <div class="d-flex">
                             <div class="bg-success  p-3 m-3  mr-3 ml-3 fs-3" style="border-radius: 20px;">
                                 <p style="margin-bottom: 5px;"> Paid</p>
-                                <p style="font-size:large;"> <span id="paidval1"></span></p>
+                                <p style="font-size:large;"> <span id="paidval1">{{paid}}</span></p>
                             </div>
                             <div class="text-dark pt-5" >
                                 <i class="fa fa-plus border-dark " aria-hidden="true" style="color: black;"></i>
                             </div>
                             <div class="bg-warning  p-3 m-3  mr-3 ml-3  fs-3" style="border-radius:20px;">
                                 <p style="margin-bottom: 5px;"> Unpaid</p>
-                                <p style="font-size:large;"><span id="unpaidval1"></span></p>
+                                <p style="font-size:large;"><span id="unpaidval1">{{unpaid}}</span></p>
                             </div>
                             <div class="text-dark pt-5">
                                 <i class="fa-solid fa fa-equals" style="color: black;"></i>
                             </div>
                             <div class="bg-secondary p-3 m-3 mr-3 ml-3  fs-3" style="border-radius:20px;">
                                 <p style="margin-bottom: 5px;"> Total</p>
-                                <p style="font-size:large;">  <span id="totalval1"></span></p>
+                                <p style="font-size:large;">  <span id="totalval1">{{total}}</span></p>
                             </div>
                         </div>
                     </div>
@@ -684,6 +682,8 @@
 
     });
 </script>
+
+
 
 <script>
 // jQuery(document).ready(function ($) {
@@ -854,12 +854,12 @@ function exportAsExcel() {
                 ttotal += parseFloat(ttextValue)
 
         }}
-        document.getElementById('paidval').textContent = ttotal-tunpaid
-        document.getElementById('unpaidval').textContent = tunpaid
-        document.getElementById('totalval').textContent = ttotal
-        document.getElementById('paidval1').textContent = ttotal-tunpaid
-        document.getElementById('unpaidval1').textContent = tunpaid
-        document.getElementById('totalval1').textContent = ttotal
+        // document.getElementById('paidval').textContent = ttotal-tunpaid
+        // document.getElementById('unpaidval').textContent = tunpaid
+        // document.getElementById('totalval').textContent = ttotal
+        // document.getElementById('paidval1').textContent = ttotal-tunpaid
+        // document.getElementById('unpaidval1').textContent = tunpaid
+        //document.getElementById('totalval1').textContent = ttotal
         document.getElementById('totalval3').textContent = ttotal
         document.getElementById('totalval2').textContent = ttotal
         document.getElementById('totalc1').textContent =c

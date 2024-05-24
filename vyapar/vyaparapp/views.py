@@ -7414,7 +7414,7 @@ def getproduct(request):
     print(p_id)
     item = ItemModel.objects.get(id=p_id)
     data7 = {'hsn': item.item_hsn,'price':item.item_sale_price,'gst':item.item_gst,'igst':item.item_igst}
-     
+    
     print(data7)
     return JsonResponse(data7)
 
@@ -16081,14 +16081,13 @@ def chequeEmail(request):
 def sales_summary(request):
   id=request.session.get('staff_id')
   staff=staff_details.objects.get(id=id)
-  # purchase_data=PurchaseBill.objects.filter(company=staff.company)
-  # debit_note=purchasedebit.objects.filter(company=staff.company)
   sales_invoices=SalesInvoice.objects.filter(company=staff.company)
   sales_invoice_items=SalesInvoiceItem.objects.filter(company=staff.company)
   paid = unpaid = total=0
  
   for i in sales_invoices:
-    
+    paid +=float(i.paidoff)
+    unpaid +=float(i.totalbalance)
     total +=float(i.grandtotal)
 
   
@@ -16103,7 +16102,9 @@ def sales_summary(request):
   }
   return render(request,'company/salesummaryhsn.html',content)
 
-#------------------------------------------------------------------------------------
+#----------------------------------------------------
+
+
 def send_hsn_report_via_mail(request):
   if request.method == 'POST':
     from_date_str=request.POST['fdate']
@@ -16113,519 +16114,680 @@ def send_hsn_report_via_mail(request):
     emails_string = request.POST['email']
     emails= [email.strip() for email in emails_string.split(',')]
     mess=request.POST['message']
-    #filter using date-------------------
     if from_date_str and To_date_str:
-      print(from_date_str)
-      print(To_date_str)
       id=request.session.get('staff_id')
       staff=staff_details.objects.get(id=id)
-      sale= salesorder.objects.filter(staff=id,orderdate__range=[from_date_str,To_date_str])
-      total=0
+
+      sale_data=SalesInvoiceItem.objects.filter(salesinvoice__date__range=[from_date_str, To_date_str],salesinvoice__company=staff.company)
+      print(sale_data,'a')
+      
+      
+      ttotal = sum(item.totalamount for item in sale_data)
+      
+     
+      paid = unpaid = total=0
+     
+      
+
       c=0
-      for i in sale:
+      for i in sale_data:
         c=c+1
-        total += float(i.grandtotal)
+        
+        paid +=float(i.salesinvoice.paidoff)
+        unpaid +=float(i.salesinvoice.totalbalance)
+        total +=float(i.salesinvoice.grandtotal)
+        
+        
       content={
-      'sale':sale,
+      'bill':sale_data,
       'staff':staff,
+      'paid':paid,
+      'unpaid':unpaid,
       'total':total,
+      'ttotal':ttotal,
       'c':c,
       'sdate':from_date_str,
       'edate':To_date_str
       }
-      template_path = 'company/share_salehsnreport_mail.html'
+      template_path = 'company/share_salehsn_report_mail.html'
       template = get_template(template_path)
 
       html  = template.render(content)
       result = BytesIO()
       pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
       pdf = result.getvalue()
-      filename = f'sales summary hsn Report.pdf'
+      filename = f'Sales summary hsn Report.pdf'
       email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
       email.attach(filename, pdf, "application/pdf")
       email.send(fail_silently=False)
-      messages.info(request,'sales summary hsnn report shared via mail')
+      messages.info(request,'sales summary by hsn shared via mail')
       return redirect('sales_summary')
-    #if search input -------------------------
+    print(from_date_str)
+    print(To_date_str)
+    
     if search:
+      print(search)
+      if SalesInvoiceItem.objects.filter(salesinvoice__date__startswith=search):
+          id=request.session.get('staff_id')
+          staff=staff_details.objects.get(id=id)
+          if SalesInvoiceItem.objects.filter(staff=id,salesinvoice__date__startswith=search).exists:
+            sale_data=SalesInvoiceItem.objects.filter(staff=id,salesinvoice__date__startswith=search)
+            ttotal = sum(item.totalamount for item in sale_data)
+            paid = unpaid = total=0
+            c=0
+            for i in sale_data:
+              c=c+1
+              paid +=float(i.salesinvoicepaidoff)
+              unpaid +=float(i.salesinvoicetotalbalance)
+              total +=float(i.salesinvoicegrandtotal)
+            content={
+            'bill':sale_data,
+            'c':c,
+            'ttotal':ttotal,
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
+
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sales Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sales report shared via mail')
+            return redirect('sales_summary')
+      
+      if SalesInvoiceItem.objects.filter(hsn__startswith=search):
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        hsn=SalesInvoiceItem.objects.get(hsn__startswith=search)
+        if SalesInvoiceItem.objects.filter(staff=id,hsn=hsn).exists:
+          sale_data=SalesInvoiceItem.objects.filter(staff=id,hsn=hsn)
+          ttotal = sum(item.totalamount for item in sale_data)
+          paid = unpaid = total=0
+          c=0
+          for i in sale_data:
+            c=c+1
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
+          content={
+          'bill':sale_data,
+          'c':c,
+          'ttotal':ttotal,
+          'staff':staff,
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
+          }
+          template_path = 'company/share_salehsn_report_mail.html'
+          template = get_template(template_path)
+
+          html  = template.render(content)
+          result = BytesIO()
+          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+          pdf = result.getvalue()
+          filename = f'Sales Report.pdf'
+          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+          email.attach(filename, pdf, "application/pdf")
+          email.send(fail_silently=False)
+          messages.info(request,'sale report shared via mail')
+          return redirect('sales_sumary') 
+      if SalesInvoiceItem.objects.filter(totalamount__istartswith=search):
+        print(search)
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoiceItem.objects.filter(staff=id,totalamount__istartswith=search).exists:
+         
+          sale_data=SalesInvoiceItem.objects.filter(staff=id,totalamount__istartswith=search)
+          ttotal = sum(item.totalamount for item in sale_data)
+          paid = unpaid = total=0
+          c=0
+          for i in sale_data:
+            c=c+1
+            paid +=float(i.salesinvoice.paidoff)
+            unpaid +=float(i.salesinvoice.totalbalance)
+            total +=float(i.salesinvoice.grandtotal)
+          content={
+          'bill':sale_data,
+          'c':c,
+          'ttotal':ttotal,
+          'staff':staff,
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
+          }
+          template_path = 'company/share_salehsn_report_mail.html'
+          template = get_template(template_path)
+
+          html  = template.render(content)
+          result = BytesIO()
+          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+          pdf = result.getvalue()
+          filename = f'Sales Report.pdf'
+          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+          email.attach(filename, pdf, "application/pdf")
+          email.send(fail_silently=False)
+          messages.info(request,'sales report shared via mail')
+          return redirect('sales_summary')    
+        
       if search.isdigit():
+        print(search)
         if SalesInvoiceItem.objects.filter(hsn__startswith=search):
           id=request.session.get('staff_id')
           staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
+          if SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=search).exists:
+            sale_data=SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=search)
+            ttotal = sum(item.totalamount for item in sale_data)
+            paid = unpaid = total=0
+            c=0
+            for i in sale_data:
+              c=c+1
+              paid +=float(i.salesinvoicepaidoff)
+              unpaid +=float(i.salesinvoicetotalbalance)
+              total +=float(i.salesinvoicegrandtotal)
+            content={
+            'bill':sale_data,
+            'ttotal':ttotal,
+            'c':c,
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
 
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-        if SalesInvoiceItem.objects.filter(grandtotal__startswith=search):
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary')
+             
+        if SalesInvoice.objects.filter(grandtotal__startswith=search):
           id=request.session.get('staff_id')
           staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,grandtotal__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
+          if SalesInvoice.objects.filter(staff=id,grandtotal__startswith=search).exists:
+            sale_data=SalesInvoice.objects.filter(staff=id,grandtotal__startswith=search)
+            ttotal = sum(item.totalamount for item in sale_data)
+            paid = unpaid = total=0
+            c=0
+            for i in sale_data:
+              c=c+1
+              paid +=float(i.paidoff)
+              unpaid +=float(i.totalbalance)
+              total +=float(i.grandtotal)
+            content={
+            'bill':sale_data,
+            'c':c,
+            'ttotal':ttotal,
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
 
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-        if SalesInvoiceItem.objects.filter(paid__startswith=search):
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary')    
+            
+        if SalesInvoiceItem.objects.filter(totalamount__startswith=search):
           id=request.session.get('staff_id')
           staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,paid__startswith=search)
-          total=0
+          if SalesInvoiceItem.objects.filter(staff=id,totalamount__startswith=search).exists:
+            sale_data=SalesInvoiceItem.objects.filter(staff=id,totalamount__startswith=search)
+            ttotal = sum(item.totalamount for item in sale_data)
+            paid = unpaid = total=0
+            c=0
+            for i in sale_data:
+              c=c+1
+              paid +=float(i.salesinvoice.paidoff)
+              unpaid +=float(i.salesinvoice.totalbalance)
+              total +=float(i.salesinvoice.grandtotal)
+            content={
+              'bill':sale_data,
+              'c':c,
+              'ttotal':ttotal,
+              'staff':staff,
+              'paid':paid,
+              'unpaid':unpaid,
+              'total':total
+              }
+            template_path = 'company/share_sales_report_mail.html'
+            template = get_template(template_path)
+
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary') 
+      if search == '0' or search =='0' or search =='0' or search =='0':
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoiceItem.objects.filter(staff=id).exists:
+          sale_data=SalesInvoiceItem.objects.filter(staff=id)
+          ttotal = sum(item.totalamount for item in sale_data)
+          paid = unpaid = total=0
           c=0
-          for i in sale:
+          for i in sale_data:
             c=c+1
-            total += float(i.grandtotal)
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
           content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
+            'bill':sale_data,
+            'c':c,
+            'ttotal':ttotal,
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+          template_path = 'company/share_salehsn_report_mail.html'
           template = get_template(template_path)
 
           html  = template.render(content)
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
+          filename = f'Sale Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-        if SalesInvoiceItem.objects.filter(igst__startswith=search):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,igst__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'salessummary by hsn report shared via mail')
-          return redirect('sales_summary')
-      if SalesInvoiceItem.objects.filter(tax__startswith=search):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,tax__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales osummary by hsn report shared via mail')
-          return redirect('sales_report')  
-      if SalesInvoiceItem.objects.filter(totalamount__startswith=search):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,totalamount__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-      if SalesInvoiceItem.objects.filter(cgst__startswith=search):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,cgst__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary') 
-      if SalesInvoiceItem.objects.filter(cgst__startswith=search):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,cgst__startswith=search)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
+          messages.info(request,'sale report shared via mail')
+          return redirect('sales_summary')   
     if filters_by:
-      if filters_by.isdigit():
-        if SalesInvoiceItem.objects.filter(orderno__startswith=filters_by):
+      if SalesInvoiceItem.objects.filter(hsn__startswith=filters_by) :
           id=request.session.get('staff_id')
           staff=staff_details.objects.get(id=id)
-          sale= salesorder.objects.filter(staff=id,orderno__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
+          if SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=filters_by).exists :
+            sale_data=SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=filters_by)
+            
+            paid = unpaid = total=0
+            for i in sale_data:
+              paid +=float(i.paidoff)
+              unpaid +=float(i.totalbalance)
+              total +=float(i.grandtotal)
+            content={
+            'bill':sale_data,
+            
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
+
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary')
+      
+      if SalesInvoiceItem.objects.filter(totalamount__startswith=filters_by):
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        totalamount=SalesInvoiceItem.objects.get(totalamount__startswith=filters_by)
+        if SalesInvoiceItem.objects.filter(staff=id,totalamount=totalamount).exists:
+          
+          sale_data=SalesInvoiceItem.objects.filter(staff=id,totalamount=totalamount)
+          
+          paid = unpaid = total=0
+          for i in sale_data:
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
           content={
-          'sale':sale,
+          'bill':sale_data,
+          
           'staff':staff,
-          'total':total,
-          'c':c
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
           }
-          template_path = 'company/share_salehsnreport_mail.html'
+          template_path = 'company/share_salehsn_report_mail.html'
           template = get_template(template_path)
 
           html  = template.render(content)
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
+          filename = f'Sale Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn  report shared via mail')
-          return redirect('sales_summary')
-        if salesorder.objects.filter(grandtotal__startswith=filters_by):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= salesorder.objects.filter(staff=id,grandtotal__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
+          messages.info(request,'sale report shared via mail')
+          return redirect('sales_summary') 
+      if SalesInvoiceItem.objects.filter(tax__istartswith=filters_by):
+        print(filters_by)
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoiceItem.objects.filter(staff=id,tax__istartswith=filters_by).exists:
+         
+          sale_data=SalesInvoiceItem.objects.filter(staff=id,tax__istartswith=filters_by)
+          
+          paid = unpaid = total=0
+          for i in sale_data:
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
           content={
-          'sale':sale,
+          'bill':sale_data,
+          
           'staff':staff,
-          'total':total,
-          'c':c
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
           }
-          template_path = 'company/share_salehsnreport_mail.html'
+          template_path = 'company/share_salehsn_report_mail.html'
           template = get_template(template_path)
 
           html  = template.render(content)
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
+          filename = f'Sale Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-        if SalesInvoiceItem.objects.filter(paid__startswith=filters_by):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale= SalesInvoiceItem.objects.filter(staff=id,paid__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-        if  SalesInvoiceItem.objects.filter(sagst__startswith=filters_by):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale=  SalesInvoiceItem.objects.filter(staff=id,sgst__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary')
-      if  SalesInvoiceItem.objects.filter(igst__startswith=filters_by):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale=  SalesInvoiceItem.objects.filter(staff=id,igst__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
-          content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
-          template = get_template(template_path)
-
-          html  = template.render(content)
-          result = BytesIO()
-          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-          pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
-          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
-          email.attach(filename, pdf, "application/pdf")
-          email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
+          messages.info(request,'sale report shared via mail')
           return redirect('sales_summary')  
-      if  SalesInvoiceItem.objects.filter(totalamount__startswith=filters_by):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale=  SalesInvoiceItem.objects.filter(staff=id,totalamount__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
+      if SalesInvoice.objects.filter(igst__istartswith=filters_by):
+        print(filters_by)
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoice.objects.filter(staff=id,igst__istartswith=filters_by).exists:
+         
+          sale_data=SalesInvoice.objects.filter(staff=id,igst__istartswith=filters_by)
+          
+          paid = unpaid = total=0
+          for i in sale_data:
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
           content={
-          'sale':sale,
+          'bill':sale_data,
+          
           'staff':staff,
-          'total':total,
-          'c':c
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
           }
-          template_path = 'company/share_salehsnreport_mail.html'
+          template_path = 'company/share_salehsn_report_mail.html'
           template = get_template(template_path)
 
           html  = template.render(content)
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
+          filename = f'Sale Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
+          messages.info(request,'sale report shared via mail')
+          return redirect('sales_summary') 
+      if SalesInvoice.objects.filter(sgst__istartswith=filters_by):
+        print(filters_by)
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoice.objects.filter(staff=id,sgst__istartswith=filters_by).exists:
+         
+          sale_data=SalesInvoice.objects.filter(staff=id,sgst__istartswith=filters_by)
+          
+          paid = unpaid = total=0
+          for i in sale_data:
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
+          content={
+          'bill':sale_data,
+          
+          'staff':staff,
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
+          }
+          template_path = 'company/share_salehsn_report_mail.html'
+          template = get_template(template_path)
+
+          html  = template.render(content)
+          result = BytesIO()
+          pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+          pdf = result.getvalue()
+          filename = f'Sale Report.pdf'
+          email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+          email.attach(filename, pdf, "application/pdf")
+          email.send(fail_silently=False)
+          messages.info(request,'sale report shared via mail')
           return redirect('sales_summary')
-      if  SalesInvoiceItem.objects.filter(tax__startswith=filters_by):
-          id=request.session.get('staff_id')
-          staff=staff_details.objects.get(id=id)
-          sale=  SalesInvoiceItem.objects.filter(staff=id,tax__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
+      if SalesInvoice.objects.filter(cgst__istartswith=filters_by):
+        print(filters_by)
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoice.objects.filter(staff=id,cgst__istartswith=filters_by).exists:
+         
+          sale_data=SalesInvoice.objects.filter(staff=id,cgst__istartswith=filters_by)
+          
+          paid = unpaid = total=0
+          for i in sale_data:
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
           content={
-          'sale':sale,
+          'bill':sale_data,
+          
           'staff':staff,
-          'total':total,
-          'c':c
+          'paid':paid,
+          'unpaid':unpaid,
+          'total':total
           }
-          template_path = 'company/share_salehsnreport_mail.html'
+          template_path = 'company/share_salehsn_report_mail.html'
           template = get_template(template_path)
 
           html  = template.render(content)
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'sales summary hsn Report.pdf'
+          filename = f'Sale Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary') 
-      if  SalesInvoiceItem.objects.filter(hsn__startswith=filters_by):
+          messages.info(request,'sale report shared via mail')
+          return redirect('sales_summary')       
+    
+      if search.isdigit():
+       
+        if SalesInvoiceItem.objects.filter(hsn__startswith=filters_by):
           id=request.session.get('staff_id')
           staff=staff_details.objects.get(id=id)
-          sale=  SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=filters_by)
-          total=0
-          c=0
-          for i in sale:
-            c=c+1
-            total += float(i.grandtotal)
+          if SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=filters_by).exists:
+            sale_data=SalesInvoiceItem.objects.filter(staff=id,hsn__startswith=filters_by)
+            
+            paid = unpaid = total=0
+            for i in sale_data:
+              paid +=float(i.paidoff)
+              unpaid +=float(i.totalbalance)
+              total +=float(i.grandtotal)
+            content={
+            'bill':sale_data,
+            
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
+
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary')
+          #grandtotal --------------------------    
+        if SalesInvoice.objects.filter(grandtotal__startswith=filters_by):
+          id=request.session.get('staff_id')
+          staff=staff_details.objects.get(id=id)
+          if SalesInvoice.objects.filter(staff=id,grandtotal__startswith=filters_by).exists:
+            sale_data=SalesInvoice.objects.filter(staff=id,grandtotal__startswith=filters_by)
+            
+            paid = unpaid = total=0
+            for i in sale_data:
+              paid +=float(i.paidoff)
+              unpaid +=float(i.totalbalance)
+              total +=float(i.grandtotal)
+            content={
+            'bill':sale_data,
+            
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
+
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary')    
+          #total value--------------------------  
+        if SalesInvoiceItem.objects.filter(totalamount__startswith=filters_by):
+          id=request.session.get('staff_id')
+          staff=staff_details.objects.get(id=id)
+          if SalesInvoiceItem.objects.filter(staff=id,totalamount__startswith=filters_by).exists:
+            sale_data=SalesInvoice.objects.filter(staff=id,balance__startswith=filters_by)
+            
+            paid = unpaid = total=0
+            for i in sale_data:
+              paid +=float(i.paidoff)
+              unpaid +=float(i.totalbalance)
+              total +=float(i.grandtotal)
+            content={
+              'bill':sale_data,
+              
+              'staff':staff,
+              'paid':paid,
+              'unpaid':unpaid,
+              'total':total
+              }
+            template_path = 'company/share_salehsn_report_mail.html'
+            template = get_template(template_path)
+
+            html  = template.render(content)
+            result = BytesIO()
+            pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+            pdf = result.getvalue()
+            filename = f'Sale Report.pdf'
+            email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
+            email.attach(filename, pdf, "application/pdf")
+            email.send(fail_silently=False)
+            messages.info(request,'sale report shared via mail')
+            return redirect('sales_summary') 
+      if filters_by == '0' or filters_by =='0' or filters_by =='0' or filters_by =='0':
+        id=request.session.get('staff_id')
+        staff=staff_details.objects.get(id=id)
+        if SalesInvoiceItem.objects.filter(staff=id).exists:
+          sale_data=SalesInvoiceItem.objects.filter(staff=id)
+          paid = unpaid = total=0
+          for i in sale_data:
+            paid +=float(i.paidoff)
+            unpaid +=float(i.totalbalance)
+            total +=float(i.grandtotal)
           content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
-          }
-          template_path = 'company/share_salehsnreport_mail.html'
+            'bill':sale_data,
+            'staff':staff,
+            'paid':paid,
+            'unpaid':unpaid,
+            'total':total
+            }
+          template_path = 'company/share_salehsn_report_mail.html'
           template = get_template(template_path)
 
           html  = template.render(content)
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'sales summary hsnReport.pdf'
+          filename = f'Sale Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sales summary by hsn report shared via mail')
-          return redirect('sales_summary') 
-    if search == '' or filters_by == '' or from_date_str == '' or To_date_str == '' : 
+          messages.info(request,'sale report shared via mail')
+          return redirect('sales_summary')  
+    if search == '' or filters_by == '' or from_date_str == '' or To_date_str == '' :
       id=request.session.get('staff_id')
       staff=staff_details.objects.get(id=id)
-      sale=  SalesInvoiceItem.objects.filter(staff=id)
-      total=0
+      sale_data=SalesInvoiceItem.objects.filter(company=staff.company)
+      print(id,'a')
+      ttotal = sum(item.totalamount for item in sale_data)
+      paid = unpaid = total=0
       c=0
-      for i in sale:
+      for i in sale_data:
         c=c+1
-        total += float(i.grandtotal)
+        paid +=float(i.salesinvoice.paidoff)
+        unpaid +=float(i.salesinvoice.totalbalance)
+        total +=float(i.salesinvoice.grandtotal)
       content={
-          'sale':sale,
-          'staff':staff,
-          'total':total,
-          'c':c
+        'bill':sale_data,
+        'c':c,
+        'ttotal':ttotal,
+        'staff':staff,
+        'paid':paid,
+        'unpaid':unpaid,
+        'total':total
       }
-      template_path = 'company/share_salehsnreport_mail.html'
+      template_path = 'company/share_salehsn_report_mail.html'
       template = get_template(template_path)
-
       html  = template.render(content)
       result = BytesIO()
       pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
       pdf = result.getvalue()
-      filename = f'sales summary hsn Report.pdf'
+      filename = f'Sale summary hsn Report.pdf'
       email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
       email.attach(filename, pdf, "application/pdf")
       email.send(fail_silently=False)
-      messages.info(request,'sales summary by hsn  report shared via mail')
-      return redirect('sales_summary')            
-   
+      messages.info(request,'sale summary by HSN shared via mail')
+      return redirect('sales_summary') 
   return redirect('sales_summary') 
