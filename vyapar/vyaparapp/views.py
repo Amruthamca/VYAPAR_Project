@@ -16177,9 +16177,9 @@ def send_hsn_report_via_mail(request):
             c=0
             for i in sale_data:
               c=c+1
-              paid +=float(i.salesinvoicepaidoff)
-              unpaid +=float(i.salesinvoicetotalbalance)
-              total +=float(i.salesinvoicegrandtotal)
+              paid +=float(i.salesinvoice.paidoff)
+              unpaid +=float(i.salesinvoice.totalbalance)
+              total +=float(i.salesinvoice.grandtotal)
             content={
             'bill':sale_data,
             'c':c,
@@ -16196,11 +16196,11 @@ def send_hsn_report_via_mail(request):
             result = BytesIO()
             pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
             pdf = result.getvalue()
-            filename = f'Sales Report.pdf'
+            filename = f'Sales summary by hsn Report.pdf'
             email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
             email.attach(filename, pdf, "application/pdf")
             email.send(fail_silently=False)
-            messages.info(request,'sales report shared via mail')
+            messages.info(request,'salessummary by HSN shared via mail')
             return redirect('sales_summary')
       
       if SalesInvoiceItem.objects.filter(hsn__startswith=search):
@@ -16233,11 +16233,11 @@ def send_hsn_report_via_mail(request):
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'Sales Report.pdf'
+          filename = f'Sales summary hsn Report.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sale report shared via mail')
+          messages.info(request,'sale summary by hsn shared via mail')
           return redirect('sales_sumary') 
       if SalesInvoiceItem.objects.filter(totalamount__istartswith=search):
         print(search)
@@ -16415,11 +16415,11 @@ def send_hsn_report_via_mail(request):
           result = BytesIO()
           pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
           pdf = result.getvalue()
-          filename = f'Sale Report.pdf'
+          filename = f'Sale summary hsnReport.pdf'
           email = EmailMessage(mess,from_email=settings.EMAIL_HOST_USER,to=emails)
           email.attach(filename, pdf, "application/pdf")
           email.send(fail_silently=False)
-          messages.info(request,'sale report shared via mail')
+          messages.info(request,'sale summary by hsn shared via mail')
           return redirect('sales_summary')   
     if filters_by:
       if SalesInvoiceItem.objects.filter(hsn__startswith=filters_by) :
